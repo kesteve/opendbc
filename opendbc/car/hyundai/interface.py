@@ -189,7 +189,12 @@ class CarInterface(CarInterfaceBase):
       stock_cp.dashcamOnly = False
 
     if stock_cp.flags & HyundaiFlags.CANFD:
-      if 0x1fa in fingerprint[CAN.ECAN]:
+      # FR_CMR_02_100ms (0x1FA) carries the front camera's speed limit sign recognition.
+      # Detect it on the same bus CarStateExt.update_speed_limit reads it from (E-CAN for LKA steering,
+      # camera bus for LFA steering), so a car never subscribes to a message that is absent on that bus.
+      # E.g. some Kia Carnival 4th gen (LFA steering) send it only on the camera bus.
+      speed_limit_bus = CAN.ECAN if lka_steering else CAN.CAM
+      if 0x1fa in fingerprint[speed_limit_bus]:
         ret.flags |= HyundaiFlagsSP.SPEED_LIMIT_AVAILABLE.value
 
       if any(0x161 in fingerprint[b] and 0x162 in fingerprint[b] for b in (CAN.ECAN, CAN.CAM)):

@@ -12,6 +12,7 @@ from opendbc.car.hyundai.values import CAR, DATE_FW_ECUS, \
                                          HyundaiFlags, get_platform_codes, HyundaiSafetyFlags, \
                                          NON_SCC_CAR
 from opendbc.car.hyundai.fingerprints import FW_VERSIONS
+from opendbc.sunnypilot.car.hyundai.values import HyundaiFlagsSP
 from opendbc.testing import fuzzy_test
 
 Ecu = CarParams.Ecu
@@ -71,6 +72,27 @@ class TestHyundaiFingerprint(unittest.TestCase):
         fingerprint[1][RADAR_START_ADDR] = 8
       CP = CarInterface.get_params(CAR.HYUNDAI_SONATA, fingerprint, [], False, False, False)
       assert CP.radarUnavailable != radar
+
+  def test_canfd_speed_limit_detection(self):
+    # Camera speed limit (FR_CMR_02_100ms, 0x1FA) must be detected on the bus CarStateExt reads it from:
+    # E-CAN for LKA steering, camera bus for LFA steering (e.g. Kia Carnival 4th gen)
+    for lka_steering in (True, False):
+      for on_ecan, on_cam in ((True, False), (False, True), (True, True), (False, False)):
+        fingerprint = gen_empty_fingerprint()
+        CAN = CanBus(None, fingerprint, lka_steering)
+        if lka_steering:
+          fingerprint[CAN.CAM] = {0x50: 8, 0x110: 8}  # LKA steering messages
+        if on_ecan:
+          fingerprint[CAN.ECAN][0x1FA] = 32
+        if on_cam:
+          fingerprint[CAN.CAM][0x1FA] = 32
+
+        CP = CarInterface.get_params(CAR.KIA_CARNIVAL_4TH_GEN, fingerprint, [], False, False, False)
+        CP_SP = CarInterface.get_params_sp(CP, CAR.KIA_CARNIVAL_4TH_GEN, fingerprint, [], False, False, False)
+        expected = on_ecan if lka_steering else on_cam
+        with self.subTest(lka_steering=lka_steering, on_ecan=on_ecan, on_cam=on_cam):
+          self.assertEqual(bool(CP.flags & HyundaiFlags.CANFD_LKA_STEER_MSG), lka_steering)
+          self.assertEqual(bool(CP_SP.flags & HyundaiFlagsSP.SPEED_LIMIT_AVAILABLE), expected)
 
   def test_alternate_limits(self):
     # Alternate lateral control limits, for high torque cars, verify Panda safety mode flag is set
