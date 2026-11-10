@@ -20,7 +20,8 @@ LongCtrlState = structs.CarControl.Actuators.LongControlState
 
 # EPS faults if you apply torque while the steering angle is above 90 degrees for more than 1 second
 # All slightly below EPS thresholds to avoid fault
-MAX_ANGLE = 720  # kepilot steering PoC: 85-degree fault avoidance off (stock 85); the EPS may fault past ~90 degrees
+MAX_ANGLE = 85
+MAX_ANGLE_CANFD_POC = 720  # kepilot steering PoC: CAN-FD fault avoidance off; the EPS may fault past ~90 degrees
 MAX_ANGLE_FRAMES = 89
 MAX_ANGLE_CONSECUTIVE_FRAMES = 2
 
@@ -62,6 +63,7 @@ class CarController(CarControllerBase, CcncCarController, EsccCarController, Lea
     CcncCarController.__init__(self, CP, CP_SP)
     EsccCarController.__init__(self, CP, CP_SP)
     MadsCarController.__init__(self)
+    self.max_angle = MAX_ANGLE_CANFD_POC if CP.flags & HyundaiFlags.CANFD else MAX_ANGLE
     LeadDataCarController.__init__(self, CP)
     LongitudinalController.__init__(self, CP, CP_SP)
     IntelligentCruiseButtonManagementInterface.__init__(self, CP, CP_SP)
@@ -94,7 +96,7 @@ class CarController(CarControllerBase, CcncCarController, EsccCarController, Lea
                                                     steer_max=steer_limit)
 
     # >90 degree steering fault prevention
-    self.angle_limit_counter, apply_steer_req = common_fault_avoidance(abs(CS.out.steeringAngleDeg) >= MAX_ANGLE, CC.latActive,
+    self.angle_limit_counter, apply_steer_req = common_fault_avoidance(abs(CS.out.steeringAngleDeg) >= self.max_angle, CC.latActive,
                                                                        self.angle_limit_counter, MAX_ANGLE_FRAMES,
                                                                        MAX_ANGLE_CONSECUTIVE_FRAMES)
 
