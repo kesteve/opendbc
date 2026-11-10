@@ -20,8 +20,9 @@ LongCtrlState = structs.CarControl.Actuators.LongControlState
 
 # EPS faults if you apply torque while the steering angle is above 90 degrees for more than 1 second
 # All slightly below EPS thresholds to avoid fault
+# kepilot: the steering PoC (route 0000016f) turned this off and the Carnival's EPS faulted 54 times, every time ~1 s
+# after the wheel passed 90 deg; the brief torque drop below is what lets openpilot hold a turn past 90 deg.
 MAX_ANGLE = 85
-MAX_ANGLE_CANFD_POC = 720  # kepilot steering PoC: CAN-FD fault avoidance off; the EPS may fault past ~90 degrees
 MAX_ANGLE_FRAMES = 89
 MAX_ANGLE_CONSECUTIVE_FRAMES = 2
 
@@ -63,7 +64,7 @@ class CarController(CarControllerBase, CcncCarController, EsccCarController, Lea
     CcncCarController.__init__(self, CP, CP_SP)
     EsccCarController.__init__(self, CP, CP_SP)
     MadsCarController.__init__(self)
-    self.max_angle = MAX_ANGLE_CANFD_POC if CP.flags & HyundaiFlags.CANFD else MAX_ANGLE
+    self.max_angle = MAX_ANGLE
     LeadDataCarController.__init__(self, CP)
     LongitudinalController.__init__(self, CP, CP_SP)
     IntelligentCruiseButtonManagementInterface.__init__(self, CP, CP_SP)
