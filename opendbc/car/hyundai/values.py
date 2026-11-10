@@ -28,9 +28,10 @@ class CarControllerParams:
 
     if CP.flags & HyundaiFlags.CANFD:
       self.STEER_MAX = 270
-      # kepilot PoC: STEER_MAX stays the scale of a 100 % torque command; the request may go up to STEER_MAX_LIMIT
-      # (about 1.85x stock; the 11-bit field allows 1023) to find what the EPS delivers. The safety limit in hyundai_canfd.h matches.
-      self.STEER_MAX_LIMIT = 500
+      # kepilot: STEER_MAX stays the scale of a 100 % torque command; the request may go up to STEER_MAX_LIMIT. The Carnival's
+      # EPS faults (MDPS_LkaFailSta) every time the request passes about 415 (22 of 22 times on the 2026-11-10 drive, at
+      # any angle or speed; 406 and below never did), so the cap is 400. The safety limit in hyundai_canfd.h matches.
+      self.STEER_MAX_LIMIT = 400
       self.STEER_DRIVER_ALLOWANCE = 250
       self.STEER_DRIVER_MULTIPLIER = 2
       self.STEER_THRESHOLD = 250
