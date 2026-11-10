@@ -33,7 +33,7 @@ class TestHyundaiCanfdBase(HyundaiButtonBase, common.CarSafetyTest, common.Drive
 
   MAX_RATE_UP = 2
   MAX_RATE_DOWN = 3
-  MAX_TORQUE_LOOKUP = [0], [270]
+  MAX_TORQUE_LOOKUP = [0], [500]  # kepilot PoC (stock 270)
 
   MAX_RT_DELTA = 112
 

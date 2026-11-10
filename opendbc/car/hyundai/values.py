@@ -28,6 +28,9 @@ class CarControllerParams:
 
     if CP.flags & HyundaiFlags.CANFD:
       self.STEER_MAX = 270
+      # kepilot PoC: STEER_MAX stays the scale of a 100 % torque command; the request may go up to STEER_MAX_LIMIT
+      # (about 1.85x stock; the 11-bit field allows 1023) to find what the EPS delivers. The safety limit in hyundai_canfd.h matches.
+      self.STEER_MAX_LIMIT = 500
       self.STEER_DRIVER_ALLOWANCE = 250
       self.STEER_DRIVER_MULTIPLIER = 2
       self.STEER_THRESHOLD = 250

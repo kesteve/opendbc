@@ -138,7 +138,8 @@ static void hyundai_canfd_rx_hook(const CANPacket_t *msg) {
 
 static bool hyundai_canfd_tx_hook(const CANPacket_t *msg) {
   const TorqueSteeringLimits HYUNDAI_CANFD_STEERING_LIMITS = {
-    .max_torque = 270,
+    // kepilot PoC: 270 -> 500 to measure what the EPS delivers (rate limits and the driver override are unchanged)
+    .max_torque = 500,
     .max_rt_delta = 112,
     .max_rate_up = 2,
     .max_rate_down = 3,

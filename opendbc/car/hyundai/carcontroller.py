@@ -20,7 +20,7 @@ LongCtrlState = structs.CarControl.Actuators.LongControlState
 
 # EPS faults if you apply torque while the steering angle is above 90 degrees for more than 1 second
 # All slightly below EPS thresholds to avoid fault
-MAX_ANGLE = 85
+MAX_ANGLE = 720  # kepilot steering PoC: 85-degree fault avoidance off (stock 85); the EPS may fault past ~90 degrees
 MAX_ANGLE_FRAMES = 89
 MAX_ANGLE_CONSECUTIVE_FRAMES = 2
 
@@ -88,7 +88,10 @@ class CarController(CarControllerBase, CcncCarController, EsccCarController, Lea
 
     # steering torque
     new_torque = int(round(actuators.torque * self.params.STEER_MAX))
-    apply_torque = apply_driver_steer_torque_limits(new_torque, self.apply_torque_last, CS.out.steeringTorque, self.params)
+    # kepilot PoC: CAN-FD requests may exceed STEER_MAX (a torque command above 1.0) up to STEER_MAX_LIMIT
+    steer_limit = getattr(self.params, "STEER_MAX_LIMIT", self.params.STEER_MAX)
+    apply_torque = apply_driver_steer_torque_limits(new_torque, self.apply_torque_last, CS.out.steeringTorque, self.params,
+                                                    steer_max=steer_limit)
 
     # >90 degree steering fault prevention
     self.angle_limit_counter, apply_steer_req = common_fault_avoidance(abs(CS.out.steeringAngleDeg) >= MAX_ANGLE, CC.latActive,
