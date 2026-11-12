@@ -225,7 +225,11 @@ class CarInterface(CarInterfaceBase):
                                    CAR.KIA_SELTOS_2023_NON_SCC, CAR.GENESIS_G70_2021_NON_SCC):
       stock_cp.dashcamOnly = True
 
-    ret.intelligentCruiseButtonManagementAvailable = not (stock_cp.flags & HyundaiFlags.CANFD_ALT_BUTTONS)
+    # kepilot: alt-button cars too where the radar runs SCC on LFA steering (e.g. Kia Carnival 4th gen): the presses go
+    # out as CRUISE_BUTTONS_ALT on the PT bus, which panda safety allows on that path only
+    alt_buttons_radar_scc = bool(stock_cp.flags & HyundaiFlags.CANFD_ALT_BUTTONS and stock_cp.flags & HyundaiFlags.CANFD_RADAR_SCC and
+                                 not stock_cp.flags & (HyundaiFlags.CANFD_LKA_STEER_MSG | HyundaiFlags.CANFD_CAMERA_SCC))
+    ret.intelligentCruiseButtonManagementAvailable = not (stock_cp.flags & HyundaiFlags.CANFD_ALT_BUTTONS) or alt_buttons_radar_scc
 
     return ret
 

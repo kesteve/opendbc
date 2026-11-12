@@ -181,6 +181,21 @@ static bool hyundai_canfd_tx_hook(const CANPacket_t *msg) {
     }
   }
 
+  // kepilot: alt cruise buttons (only in the radar-SCC alt-buttons TX list): resume/set while controls are allowed,
+  // cancel while cruising, and never the main, normal-main or LDA (MADS) buttons
+  if (msg->addr == 0x1aaU) {
+    int button = (msg->data[4] >> 4) & 0x7U;
+    bool is_cancel = (button == HYUNDAI_BTN_CANCEL);
+    bool is_resume = (button == HYUNDAI_BTN_RESUME);
+    bool is_set = (button == HYUNDAI_BTN_SET);
+    bool other_buttons = GET_BIT(msg, 34U) || GET_BIT(msg, 39U) || GET_BIT(msg, 41U);
+
+    bool allowed = !other_buttons && ((is_cancel && cruise_engaged_prev) || ((is_resume || is_set) && controls_allowed));
+    if (!allowed) {
+      tx = false;
+    }
+  }
+
   // UDS: only tester present ("\x02\x3E\x80\x00\x00\x00\x00\x00") allowed on diagnostics address
   if (((msg->addr == 0x730U) && hyundai_canfd_lka_steer_msg) || ((msg->addr == 0x7D0U) && !hyundai_camera_scc)) {
     if (GET_BYTES_64_LE(msg, 0, 8) != 0x0000000000803E02ULL) {
@@ -248,6 +263,15 @@ static safety_config hyundai_canfd_init(uint16_t param) {
 
   static const CanMsg HYUNDAI_CANFD_LFA_STEERING_TX_MSGS[] = {
     HYUNDAI_CANFD_CRUISE_BUTTON_TX_MSGS(2)
+    HYUNDAI_CANFD_LFA_STEERING_COMMON_TX_MSGS(0)
+    HYUNDAI_CANFD_SCC_CONTROL_COMMON_TX_MSGS(0, false)
+  };
+
+  // kepilot: radar-SCC LFA steering cars with the alt buttons message (e.g. Kia Carnival 4th gen): the steering wheel
+  // sends CRUISE_BUTTONS_ALT on the PT bus straight to the radar, which runs SCC; cruise button presses (ICBM) are sent
+  // there too. Checked in the tx hook like CRUISE_BUTTONS.
+  static const CanMsg HYUNDAI_CANFD_LFA_STEERING_ALT_BUTTONS_TX_MSGS[] = {
+    {0x1AA, 0, 16, .check_relay = false},  // CRUISE_BUTTONS_ALT
     HYUNDAI_CANFD_LFA_STEERING_COMMON_TX_MSGS(0)
     HYUNDAI_CANFD_SCC_CONTROL_COMMON_TX_MSGS(0, false)
   };
@@ -349,7 +373,11 @@ static safety_config hyundai_canfd_init(uint16_t param) {
         HYUNDAI_CANFD_SCC_ADDR_CHECK(0)
       };
 
-      SET_TX_MSGS(HYUNDAI_CANFD_LFA_STEERING_TX_MSGS, ret);
+      if (hyundai_canfd_alt_buttons) {
+        SET_TX_MSGS(HYUNDAI_CANFD_LFA_STEERING_ALT_BUTTONS_TX_MSGS, ret);
+      } else {
+        SET_TX_MSGS(HYUNDAI_CANFD_LFA_STEERING_TX_MSGS, ret);
+      }
 
       if (hyundai_canfd_alt_buttons) {
         SET_RX_CHECKS(hyundai_canfd_alt_buttons_radar_scc_rx_checks, ret);

@@ -84,6 +84,20 @@ def create_buttons(packer, CP, CAN, cnt, btn):
   return packer.make_can_msg("CRUISE_BUTTONS", bus, values)
 
 
+def create_buttons_alt(packer, CAN, wheel_msg, cnt, btn):
+  """kepilot: a CRUISE_BUTTONS_ALT press: the wheel's latest frame as it is (its other inputs and states), with our
+  counter and button, and no main, normal-main or LDA button (panda safety blocks those). The packer fills the CRC."""
+  values = {k: v for k, v in wheel_msg.items() if k != "CHECKSUM"}
+  values.update({
+    "COUNTER": cnt,
+    "CRUISE_BUTTONS": btn,
+    "ADAPTIVE_CRUISE_MAIN_BTN": 0,
+    "NORMAL_CRUISE_MAIN_BTN": 0,
+    "LDA_BTN": 0,
+  })
+  return packer.make_can_msg("CRUISE_BUTTONS_ALT", CAN.ECAN, values)
+
+
 def create_acc_cancel(packer, CP, CAN, cruise_info_copy):
   # CAN FD camera-based SCC requires additional signals to be preserved
   # verbatim from the previous SCC_CONTROL frame to avoid checksum or

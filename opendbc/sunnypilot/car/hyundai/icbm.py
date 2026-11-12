@@ -16,6 +16,7 @@ ButtonType = structs.CarState.ButtonEvent.Type
 SendButtonState = structs.IntelligentCruiseButtonManagement.SendButtonState
 
 BUTTON_COPIES = 2
+ALT_BUTTON_COPIES = 5  # kepilot: CRUISE_BUTTONS_ALT frames per send (16 bytes each on CAN FD; a real press is 5 frames)
 BUTTON_COPIES_TIME = 7
 BUTTON_COPIES_TIME_IMPERIAL = [BUTTON_COPIES_TIME + 3, 70]
 BUTTON_COPIES_TIME_METRIC = [BUTTON_COPIES_TIME, 40]
@@ -47,8 +48,19 @@ class IntelligentCruiseButtonManagementInterface(IntelligentCruiseButtonManageme
   def create_canfd_mock_button_messages(self, packer, CS, CAN, send_button) -> list[CanData]:
     can_sends = []
     if self.CP.flags & HyundaiFlags.CANFD_ALT_BUTTONS:
-      # TODO: resume for alt button cars
-      pass
+      # kepilot: the wheel sends CRUISE_BUTTONS_ALT at 50 Hz with an 8-bit counter on the bus the radar (SCC) listens
+      # on, and we can't block it: the same timing as the CRUISE_BUTTONS presses below (frames ahead of the wheel's
+      # next counters), from a copy of its latest frame
+      if not CS.cruise_buttons_alt_msg:
+        return can_sends
+      if (self.frame - self.last_button_frame) * DT_CTRL > 0.2:
+        self.button_frame += 1
+        button_counter_offset = [1, 1, 0, None][self.button_frame % 4]
+        if button_counter_offset is not None:
+          cnt = (int(CS.buttons_counter) + button_counter_offset) % 0x100
+          for _ in range(ALT_BUTTON_COPIES):
+            can_sends.append(hyundaicanfd.create_buttons_alt(packer, CAN, CS.cruise_buttons_alt_msg, cnt, send_button))
+          self.last_button_frame = self.frame
     else:
       if (self.frame - self.last_button_frame) * DT_CTRL > 0.2:
         self.button_frame += 1

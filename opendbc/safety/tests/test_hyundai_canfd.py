@@ -7,7 +7,7 @@ from opendbc.sunnypilot.car.hyundai.values import HyundaiSafetyFlagsSP
 from opendbc.car.structs import CarParams
 import opendbc.safety.tests.common as common
 from opendbc.safety.tests.libsafety import libsafety_py
-from opendbc.safety.tests.hyundai_common import HyundaiButtonBase, HyundaiLongitudinalBase
+from opendbc.safety.tests.hyundai_common import Buttons, HyundaiButtonBase, HyundaiLongitudinalBase
 
 # All combinations of radar/camera-SCC and gas/hybrid/EV cars
 ALL_GAS_EV_HYBRID_COMBOS = [
@@ -140,14 +140,37 @@ class TestHyundaiCanfdLFASteeringAltButtonsBase(TestHyundaiCanfdLFASteeringBase)
     values = {"ACCMode": 4 if cancel else 0, "aReqRaw": accel, "aReqValue": accel}
     return self.packer.make_can_msg_safety("SCC_CONTROL", self.PT_BUS, values)
 
+  def _alt_button_sends_allowed(self):
+    # kepilot: radar-SCC LFA steering without openpilot longitudinal (e.g. Kia Carnival 4th gen, ICBM)
+    return not (self.SAFETY_PARAM & (HyundaiSafetyFlags.CAMERA_SCC | HyundaiSafetyFlags.LONG))
+
   def test_button_sends(self):
     """
-      No button send allowed with alt buttons.
+      Alt buttons: only on radar-SCC cars without openpilot longitudinal, resume/set only while controls are allowed,
+      cancel only while cruising; nothing on the other alt-button paths.
     """
     for enabled in (True, False):
       for btn in range(8):
         self.safety.set_controls_allowed(enabled)
-        self.assertFalse(self._tx(self._button_msg(btn)))
+        should_tx = self._alt_button_sends_allowed() and enabled and btn in (Buttons.RESUME, Buttons.SET)
+        self.assertEqual(should_tx, self._tx(self._button_msg(btn)), (enabled, btn))
+
+  def test_alt_button_sends_never_press_other_buttons(self):
+    for enabled in (True, False):
+      self.safety.set_controls_allowed(enabled)
+      for btn in (Buttons.RESUME, Buttons.SET):
+        self.assertFalse(self._tx(self._button_msg(btn, main_button=1)))
+        self.assertFalse(self._tx(self.packer.make_can_msg_safety("CRUISE_BUTTONS_ALT", self.PT_BUS,
+                                                                  {"CRUISE_BUTTONS": btn, "LDA_BTN": 1})))
+        self.assertFalse(self._tx(self.packer.make_can_msg_safety("CRUISE_BUTTONS_ALT", self.PT_BUS,
+                                                                  {"CRUISE_BUTTONS": btn, "NORMAL_CRUISE_MAIN_BTN": 1})))
+
+  def test_alt_cancel_only_while_cruising(self):
+    if not self._alt_button_sends_allowed():
+      return
+    for enabled in (True, False):
+      self._rx(self._pcm_status_msg(enabled))
+      self.assertEqual(enabled, self._tx(self._button_msg(Buttons.CANCEL)))
 
   def test_acc_cancel(self):
     # FIXME: the CANFD_ALT_BUTTONS cars are the only ones that use SCC_CONTROL to cancel, why can't we use buttons?
